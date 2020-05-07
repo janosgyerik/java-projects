@@ -8,9 +8,10 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.Message;
-import tftp.common.MessageFactory;
-import tftp.common.MessageParser;
+import tftp.common.message.Message;
+import tftp.common.PayloadFactory;
+import tftp.common.message.MessageParser;
+import tftp.common.ErrorCode;
 
 import static tftp.common.Opcode.RRQ;
 
@@ -19,7 +20,7 @@ public class TftpServer {
   private static final Logger LOG = LoggerFactory.getLogger(TftpServer.class);
 
   private final MessageParser messageParser = new MessageParser();
-  private final MessageFactory messageFactory = new MessageFactory();
+  private final PayloadFactory payloadFactory = new PayloadFactory();
   private final int port;
 
   private DatagramSocket socket;
@@ -30,18 +31,29 @@ public class TftpServer {
     this.port = port;
   }
 
+  private void sendError(DatagramPacket packet, ErrorCode error, String message) {
+    packet.setData(payloadFactory.createError(error, message));
+    try {
+      socket.send(packet);
+    } catch (IOException e) {
+      LOG.error("I/O error while sending ERROR: {}", e.getMessage(), e);
+    }
+  }
+
   private void sendData(DatagramPacket packet, byte[] data, int size) throws IOException {
-    packet.setData(messageFactory.createData(0, data, size));
+    LOG.info("Sending data of {} bytes...", size);
+    packet.setData(payloadFactory.createData(0, data, size));
     socket.send(packet);
   }
 
   private void sendFile(DatagramPacket packet, String path) {
-    LOG.info("Try to serve file '{}'...", path);
+    LOG.info("Sending file '{}'...", path);
     try (InputStream inputStream = new FileInputStream(path)) {
       byte[] data = new byte[512];
       while (true) {
         int size = inputStream.read(data);
         if (size == -1) {
+          LOG.info("Sending file '{}' done!", path);
           break;
         }
 
@@ -51,9 +63,8 @@ public class TftpServer {
         //receiveAck(packet);
       }
     } catch (IOException e) {
-      LOG.info(e.getMessage(), e);
-      // TODO
-      // sendError(packet);
+      LOG.error("Error while sending data: {}", e.getMessage(), e);
+      sendError(packet, ErrorCode.NOT_DEFINED, e.getMessage());
     }
   }
 
@@ -69,17 +80,18 @@ public class TftpServer {
         try {
           socket.receive(packet);
         } catch (IOException e) {
-          throw new UnsupportedOperationException("TODO: handle error while receiving packet");
+          LOG.error("I/O error while receiving data: {}", e.getMessage(), e);
+          continue;
         }
 
-        Message message = messageParser.parse(buffer);
+        Message message = messageParser.parse(packet);
 
         if (message == null) {
-          throw new UnsupportedOperationException("TODO: handle unknown message");
+          LOG.error("Invalid packet from client");
         } else if (message.opcode() == RRQ) {
           sendFile(packet, message.path());
         } else {
-          throw new UnsupportedOperationException("TODO: handle unsupported message");
+          LOG.error("Unexpected opcode {}, ignoring packet", message.opcode());
         }
       }
     }

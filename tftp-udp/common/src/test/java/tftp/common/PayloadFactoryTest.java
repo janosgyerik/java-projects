@@ -4,13 +4,13 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MessageFactoryTest {
-  private final MessageFactory underTest = new MessageFactory();
+class PayloadFactoryTest {
+  private final PayloadFactory underTest = new PayloadFactory();
 
   @Test
   void createRRQ() {
     byte[] bytes = underTest.createRRQ("sample.txt");
-    assertThat(bytes[1]).isEqualTo(Opcode.RRQ.getOpcode());
+    assertThat(bytes[1]).isEqualTo(Opcode.RRQ.opcode());
     assertThat((char) bytes[2]).isEqualTo('s');
     assertThat((char) bytes[3]).isEqualTo('a');
     assertThat((char) bytes[4]).isEqualTo('m');

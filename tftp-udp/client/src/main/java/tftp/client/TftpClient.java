@@ -9,9 +9,9 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.Message;
-import tftp.common.MessageFactory;
-import tftp.common.MessageParser;
+import tftp.common.message.Message;
+import tftp.common.PayloadFactory;
+import tftp.common.message.MessageParser;
 import tftp.common.Opcode;
 
 public class TftpClient {
@@ -19,11 +19,12 @@ public class TftpClient {
   private static final Logger LOG = LoggerFactory.getLogger(TftpClient.class);
 
   private final MessageParser messageParser = new MessageParser();
-  private final MessageFactory messageFactory = new MessageFactory();
-  private int serverPort;
+  private final PayloadFactory payloadFactory = new PayloadFactory();
+  private final int serverPort;
+
   private DatagramSocket socket;
 
-  public void connect(int serverPort) {
+  public TftpClient(int serverPort) {
     this.serverPort = serverPort;
   }
 
@@ -33,7 +34,7 @@ public class TftpClient {
 
       InetAddress address = InetAddress.getByName("localhost");
 
-      byte[] rrq = messageFactory.createRRQ(remotePath);
+      byte[] rrq = payloadFactory.createRRQ(remotePath);
       DatagramPacket packet = new DatagramPacket(rrq, rrq.length, address, serverPort);
 
       try {
@@ -49,20 +50,22 @@ public class TftpClient {
   }
 
   private void receiveData(DatagramPacket packet, String path) {
-    try (FileOutputStream ostream = new FileOutputStream(path)) {
+    try (FileOutputStream out = new FileOutputStream(path)) {
       packet.setData(new byte[516]);
 
       while (true) {
         socket.receive(packet);
 
-        Message message = messageParser.parse(packet.getData(), packet.getLength());
+        Message message = messageParser.parse(packet);
         if (message == null) {
           String msg = "Invalid packet from server";
           LOG.error(msg);
           throw new IllegalStateException(msg);
         } else if (message.opcode() == Opcode.DATA) {
+          LOG.info("Received data of {} bytes", message.data().length);
+
           byte[] data = message.data();
-          ostream.write(data);
+          out.write(data);
 
           // TODO send ack
 

@@ -1,20 +1,23 @@
 package tftp.common;
 
+import java.net.DatagramPacket;
 import org.junit.jupiter.api.Test;
+import tftp.common.message.Message;
+import tftp.common.message.MessageParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MessageParserTest {
-  private final MessageFactory factory = new MessageFactory();
+  private final PayloadFactory factory = new PayloadFactory();
   private final MessageParser underTest = new MessageParser();
 
   @Test
   void parse_RRQ() {
     String path = "sample.txt";
-    byte[] buffer = factory.createRRQ(path);
-    Message rrq = underTest.parse(buffer);
+    byte[] bytes = factory.createRRQ(path);
+    DatagramPacket packet = new DatagramPacket(bytes, bytes.length);
+    Message rrq = underTest.parse(packet);
     assertThat(rrq.opcode()).isEqualTo(Opcode.RRQ);
     assertThat(rrq.path()).isEqualTo(path);
-    assertThat(rrq.data()).isNull();
   }
 }
