@@ -73,7 +73,7 @@ public class TftpClient {
             break;
           }
         } else if (message.opcode() == Opcode.ERROR) {
-          LOG.error("Received error from server. Aborting download.");
+          LOG.error("Received error, will aborting download: {} ({})", message.errorCode(), message.errorMessage());
           break;
         } else {
           String msg = "Unexpected opcode: " + message.opcode();

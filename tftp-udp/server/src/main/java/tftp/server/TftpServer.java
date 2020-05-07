@@ -1,6 +1,7 @@
 package tftp.server;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramPacket;
@@ -41,13 +42,11 @@ public class TftpServer {
   }
 
   private void sendData(DatagramPacket packet, byte[] data, int size) throws IOException {
-    LOG.info("Sending data of {} bytes...", size);
     packet.setData(payloadFactory.createData(0, data, size));
     socket.send(packet);
   }
 
   private void sendFile(DatagramPacket packet, String path) {
-    LOG.info("Sending file '{}'...", path);
     try (InputStream inputStream = new FileInputStream(path)) {
       byte[] data = new byte[512];
       while (true) {
@@ -57,11 +56,15 @@ public class TftpServer {
           break;
         }
 
+        LOG.info("Sending {} bytes of '{}' ...", size, path);
         sendData(packet, data, size);
 
         // TODO
         //receiveAck(packet);
       }
+    } catch (FileNotFoundException e) {
+      LOG.error("File not found: {}", path);
+      sendError(packet, ErrorCode.FILE_NOT_FOUND, e.getMessage());
     } catch (IOException e) {
       LOG.error("Error while sending data: {}", e.getMessage(), e);
       sendError(packet, ErrorCode.NOT_DEFINED, e.getMessage());
