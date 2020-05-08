@@ -31,11 +31,35 @@ public class Channel {
     this.packet = packet;
   }
 
+  private void sendAck() throws IOException {
+    LOG.info("Sending ACK ...");
+    packet.setData(payloadFactory.createAck(0));
+    socket.send(packet);
+  }
+
+  private void receiveAck() throws IOException {
+    LOG.info("Waiting for ACK ...");
+    socket.receive(packet);
+
+    Message message = messageParser.parse(packet);
+
+    if (message == null) {
+      String msg = "Invalid packet from peer";
+      LOG.error(msg);
+      throw new IllegalStateException(msg);
+    }
+
+    if (message.opcode() != Opcode.ACK) {
+      String msg = "Expected ACK. Got: " + message.opcode();
+      LOG.error(msg);
+      throw new IllegalStateException(msg);
+    }
+  }
+
   public void receiveFile(String localPath) {
     try (FileOutputStream out = new FileOutputStream(localPath)) {
-      packet.setData(new byte[516]);
-
       while (true) {
+        packet.setData(new byte[516]);
         socket.receive(packet);
 
         Message message = messageParser.parse(packet);
@@ -49,7 +73,7 @@ public class Channel {
           byte[] data = message.data();
           out.write(data);
 
-          // TODO send ack
+          sendAck();
 
           if (data.length < 512) {
             break;
@@ -81,8 +105,7 @@ public class Channel {
         LOG.info("Sending {} bytes of '{}' ...", size, path);
         sendData(data, size);
 
-        // TODO
-        //receiveAck(packet);
+        receiveAck();
       }
     } catch (FileNotFoundException e) {
       LOG.error("File not found: {}", path);

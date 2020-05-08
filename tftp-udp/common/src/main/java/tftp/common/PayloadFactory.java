@@ -36,4 +36,12 @@ public class PayloadFactory {
     System.arraycopy(messageBytes, 0, bytes, 4, messageBytes.length);
     return bytes;
   }
+
+  public byte[] createAck(int blockNum) {
+    byte[] bytes = new byte[2 + 2];
+    bytes[1] = Opcode.ACK.opcode();
+    bytes[2] = (byte) (blockNum >> 8);
+    bytes[3] = (byte) (blockNum & 0xff);
+    return bytes;
+  }
 }

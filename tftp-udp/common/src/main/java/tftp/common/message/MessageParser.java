@@ -29,6 +29,10 @@ public class MessageParser {
       return new DataMessage(Arrays.copyOfRange(bytes, 4, payloadSize));
     }
 
+    if (opcode == Opcode.ACK.opcode()) {
+      return new AckMessage();
+    }
+
     if (opcode == Opcode.ERROR.opcode()) {
       return new ErrorMessage(bytes[3], extractStringAt(bytes, 4));
     }
