@@ -26,8 +26,8 @@ public class TftpClient {
     try (DatagramSocket socket = new DatagramSocket(serverPort + 1)) {
       InetAddress address = InetAddress.getByName("localhost");
 
-      byte[] rrq = payloadFactory.createRRQ(remotePath);
-      DatagramPacket packet = new DatagramPacket(rrq, rrq.length, address, serverPort);
+      byte[] bytes = payloadFactory.createRRQ(remotePath);
+      DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address, serverPort);
 
       try {
         LOG.info("Sending RRQ for path '{}'...", remotePath);
@@ -41,7 +41,22 @@ public class TftpClient {
     }
   }
 
-  public void put(String localPath, String remotePath) {
+  public void put(String localPath, String remotePath) throws SocketException, UnknownHostException {
+    try (DatagramSocket socket = new DatagramSocket(serverPort + 1)) {
+      InetAddress address = InetAddress.getByName("localhost");
 
+      byte[] bytes = payloadFactory.createWRQ(remotePath);
+      DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address, serverPort);
+
+      try {
+        LOG.info("Sending WRQ for path '{}'...", remotePath);
+        socket.send(packet);
+      } catch (IOException e) {
+        LOG.error("Sending WRQ failed: {}", e.getMessage(), e);
+        return;
+      }
+
+      new Channel(socket, packet).sendFile(localPath);
+    }
   }
 }

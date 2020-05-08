@@ -10,14 +10,22 @@ public class PayloadFactory {
     return bytes;
   }
 
-  public byte[] createRRQ(String path) {
+  private byte[] createReadOrWriteRequest(Opcode opcode, String path) {
     byte[] pathBytes = path.getBytes();
     byte[] modeBytes = "octet".getBytes();
     byte[] bytes = new byte[2 + pathBytes.length + 1 + modeBytes.length + 1];
-    bytes[1] = Opcode.RRQ.opcode();
+    bytes[1] = opcode.opcode();
     System.arraycopy(pathBytes, 0, bytes, 2, pathBytes.length);
     System.arraycopy(modeBytes, 0, bytes, 2 + pathBytes.length + 1, modeBytes.length);
     return bytes;
+  }
+
+  public byte[] createRRQ(String path) {
+    return createReadOrWriteRequest(Opcode.RRQ, path);
+  }
+
+  public byte[] createWRQ(String path) {
+    return createReadOrWriteRequest(Opcode.WRQ, path);
   }
 
   public byte[] createError(ErrorCode error, String message) {

@@ -11,6 +11,7 @@ import tftp.common.message.Message;
 import tftp.common.message.MessageParser;
 
 import static tftp.common.Opcode.RRQ;
+import static tftp.common.Opcode.WRQ;
 
 public class TftpServer {
 
@@ -45,6 +46,8 @@ public class TftpServer {
           LOG.error("Invalid packet from peer");
         } else if (message.opcode() == RRQ) {
           new Channel(socket, packet).sendFile(message.path());
+        } else if (message.opcode() == WRQ) {
+          new Channel(socket).receiveFile(message.path());
         } else {
           LOG.error("Unexpected opcode {}, ignoring packet", message.opcode());
         }
