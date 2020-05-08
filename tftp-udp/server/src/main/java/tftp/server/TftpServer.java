@@ -1,18 +1,14 @@
 package tftp.server;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tftp.common.message.Channel;
 import tftp.common.message.Message;
-import tftp.common.PayloadFactory;
 import tftp.common.message.MessageParser;
-import tftp.common.ErrorCode;
 
 import static tftp.common.Opcode.RRQ;
 
@@ -21,10 +17,7 @@ public class TftpServer {
   private static final Logger LOG = LoggerFactory.getLogger(TftpServer.class);
 
   private final MessageParser messageParser = new MessageParser();
-  private final PayloadFactory payloadFactory = new PayloadFactory();
   private final int port;
-
-  private DatagramSocket socket;
 
   private volatile boolean stop = false;
 
@@ -32,49 +25,8 @@ public class TftpServer {
     this.port = port;
   }
 
-  private void sendError(DatagramPacket packet, ErrorCode error, String message) {
-    packet.setData(payloadFactory.createError(error, message));
-    try {
-      socket.send(packet);
-    } catch (IOException e) {
-      LOG.error("I/O error while sending ERROR: {}", e.getMessage(), e);
-    }
-  }
-
-  private void sendData(DatagramPacket packet, byte[] data, int size) throws IOException {
-    packet.setData(payloadFactory.createData(0, data, size));
-    socket.send(packet);
-  }
-
-  private void sendFile(DatagramPacket packet, String path) {
-    try (InputStream inputStream = new FileInputStream(path)) {
-      byte[] data = new byte[512];
-      while (true) {
-        int size = inputStream.read(data);
-        if (size == -1) {
-          LOG.info("Sending file '{}' done!", path);
-          break;
-        }
-
-        LOG.info("Sending {} bytes of '{}' ...", size, path);
-        sendData(packet, data, size);
-
-        // TODO
-        //receiveAck(packet);
-      }
-    } catch (FileNotFoundException e) {
-      LOG.error("File not found: {}", path);
-      sendError(packet, ErrorCode.FILE_NOT_FOUND, e.getMessage());
-    } catch (IOException e) {
-      LOG.error("Error while sending data: {}", e.getMessage(), e);
-      sendError(packet, ErrorCode.NOT_DEFINED, e.getMessage());
-    }
-  }
-
   public void start() throws SocketException {
     try (DatagramSocket socket = new DatagramSocket(port)) {
-      this.socket = socket;
-
       // a buffer big enough for all operations
       byte[] buffer = new byte[516];
 
@@ -90,9 +42,9 @@ public class TftpServer {
         Message message = messageParser.parse(packet);
 
         if (message == null) {
-          LOG.error("Invalid packet from client");
+          LOG.error("Invalid packet from peer");
         } else if (message.opcode() == RRQ) {
-          sendFile(packet, message.path());
+          new Channel(socket, packet).sendFile(message.path());
         } else {
           LOG.error("Unexpected opcode {}, ignoring packet", message.opcode());
         }
