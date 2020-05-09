@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
@@ -16,7 +17,7 @@ import org.slf4j.LoggerFactory;
 public class Channel {
   private static final Logger LOG = LoggerFactory.getLogger(Channel.class);
 
-  private static final int AWAIT_TIMEOUT_SECONDS = 1;
+  private static final int TIMEOUT_SECONDS = 1;
 
   private final MessageParser messageParser = new MessageParser();
   private final PayloadFactory payloadFactory = new PayloadFactory();
@@ -41,9 +42,13 @@ public class Channel {
   private Message receiveMessage() {
     try {
       packet.setData(new byte[516]);
+      socket.setSoTimeout(TIMEOUT_SECONDS * 1000);
       socket.receive(packet);
+    } catch (SocketTimeoutException e) {
+      LOG.error("Socket timed out while receiving packet");
+      return null;
     } catch (IOException e) {
-      LOG.error("I/O error while receiving package");
+      LOG.error("I/O error while receiving packet");
       return null;
     }
 
@@ -73,7 +78,7 @@ public class Channel {
     LOG.info("Waiting for ACK {} ...", blockNum);
     Message message;
     try {
-      message = messageQueue.poll(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      message = messageQueue.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       LOG.error("Interrupted while waiting for ACK {}", blockNum);
       return false;
@@ -114,7 +119,7 @@ public class Channel {
     LOG.info("Waiting for DATA ...");
     Message message;
     try {
-      message = messageQueue.poll(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      message = messageQueue.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       LOG.error("Interrupted while waiting for DATA");
       return null;
