@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 public class Channel {
   private static final Logger LOG = LoggerFactory.getLogger(Channel.class);
 
+  public static final int MAX_PACKET_LENGTH = 516;
+
   private static final int TIMEOUT_SECONDS = 1;
 
   private final MessageParser messageParser = new MessageParser();
@@ -41,7 +43,7 @@ public class Channel {
 
   private Message receiveMessage() {
     try {
-      packet.setData(new byte[516]);
+      packet.setData(new byte[MAX_PACKET_LENGTH]);
       socket.setSoTimeout(TIMEOUT_SECONDS * 1000);
       socket.receive(packet);
     } catch (SocketTimeoutException e) {

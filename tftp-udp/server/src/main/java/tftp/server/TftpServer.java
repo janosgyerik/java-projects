@@ -12,6 +12,8 @@ import tftp.common.Channel;
 import tftp.common.Message;
 import tftp.common.MessageParser;
 
+import static tftp.common.Channel.MAX_PACKET_LENGTH;
+
 public class TftpServer {
 
   private static final Logger LOG = LoggerFactory.getLogger(TftpServer.class);
@@ -33,7 +35,7 @@ public class TftpServer {
     try (DatagramSocket socket = new DatagramSocket(port)) {
       while (!stop) {
         // a buffer big enough for all valid operations
-        byte[] buffer = new byte[516];
+        byte[] buffer = new byte[MAX_PACKET_LENGTH];
 
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
         try {
