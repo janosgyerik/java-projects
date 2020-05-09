@@ -7,55 +7,161 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Channel {
   private static final Logger LOG = LoggerFactory.getLogger(Channel.class);
 
+  private static final int AWAIT_TIMEOUT_SECONDS = 1;
+
   private final MessageParser messageParser = new MessageParser();
   private final PayloadFactory payloadFactory = new PayloadFactory();
+  private final BlockingDeque<Message> messageQueue = new LinkedBlockingDeque<>();
 
   private final DatagramSocket socket;
   private final DatagramPacket packet;
+  private final boolean sync;
 
-  public Channel(DatagramSocket socket) {
-    this(socket, new DatagramPacket(new byte[0], 0));
-  }
+  private volatile boolean stop = false;
 
-  public Channel(DatagramSocket socket, DatagramPacket packet) {
+  public Channel(DatagramSocket socket, DatagramPacket packet, boolean sync) {
     this.socket = socket;
     this.packet = packet;
+    this.sync = sync;
   }
 
-  public void sendAck(int blockNum) throws IOException {
-    LOG.info("Sending ACK {} ...", blockNum);
-    packet.setData(payloadFactory.createAck(blockNum));
-    socket.send(packet);
+  public void receive(Message message) {
+    messageQueue.add(message);
   }
 
-  public void receiveAck(int blockNum) throws IOException {
-    LOG.info("Waiting for ACK {} ...", blockNum);
-    socket.receive(packet);
-
-    Message message = messageParser.parse(packet);
-
-    if (message == null) {
-      String msg = "Invalid packet from peer";
-      LOG.error(msg);
-      throw new IllegalStateException(msg);
+  private Message receiveMessage() {
+    try {
+      packet.setData(new byte[516]);
+      socket.receive(packet);
+    } catch (IOException e) {
+      LOG.error("I/O error while receiving package");
+      return null;
     }
 
+    Message message = messageParser.parse(packet);
+    if (message == null) {
+      LOG.error("Invalid packet from peer");
+      return null;
+    }
+
+    return message;
+  }
+
+  private boolean isExpectedAck(Message message, int blockNum) {
     if (message.opcode() != Opcode.ACK) {
-      String msg = "Expected ACK; got: " + message.opcode();
-      LOG.error(msg);
-      throw new IllegalStateException(msg);
+      LOG.error("Expected ACK with blockNum = {}; got: {}", blockNum, message);
+      return false;
     }
 
     if (message.blockNum() != blockNum) {
-      String msg = String.format("Expected blockNum = %s; got: %s", blockNum, message.blockNum());
-      LOG.error(msg);
-      throw new IllegalStateException(msg);
+      LOG.error("Expected ACK with blockNum = {}; got: {}", blockNum, message.blockNum());
+      return false;
+    }
+    return true;
+  }
+
+  private boolean awaitAck(int blockNum) {
+    LOG.info("Waiting for ACK {} ...", blockNum);
+    Message message;
+    try {
+      message = messageQueue.poll(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOG.error("Interrupted while waiting for ACK {}", blockNum);
+      return false;
+    }
+
+    if (message == null) {
+      LOG.error("Did not receive ACK {} on time", blockNum);
+      return false;
+    }
+
+    if (!isExpectedAck(message, blockNum)) {
+      return false;
+    }
+
+    LOG.info("Received ACK {}", message.blockNum());
+    return true;
+  }
+
+  public boolean receiveAck(int blockNum) {
+    if (!sync) {
+      return awaitAck(blockNum);
+    }
+
+    final Message message = receiveMessage();
+    if (message == null) {
+      return false;
+    }
+
+    if (!isExpectedAck(message, blockNum)) {
+      return false;
+    }
+
+    LOG.info("Received ACK {}", message.blockNum());
+    return true;
+  }
+
+  private Message awaitData() {
+    LOG.info("Waiting for DATA ...");
+    Message message;
+    try {
+      message = messageQueue.poll(AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      LOG.error("Interrupted while waiting for DATA");
+      return null;
+    }
+
+    if (message == null) {
+      LOG.error("Did not receive DATA on time");
+      return null;
+    }
+
+    if (message.opcode() != Opcode.DATA) {
+      LOG.error("Expected DATA; got: {}", message);
+      return null;
+    }
+
+    LOG.info("Received {}", message);
+    return message;
+  }
+
+  private Message receiveData() {
+    if (!sync) {
+      return awaitData();
+    }
+
+    final Message message = receiveMessage();
+    if (message == null) {
+      return null;
+    }
+
+    if (message.opcode() != Opcode.DATA) {
+      LOG.error("Expected DATA; got: {}", message);
+      return null;
+    }
+
+    LOG.info("Received {}", message);
+    return message;
+  }
+
+  public boolean sendAck(int blockNum) {
+    LOG.info("Sending ACK {} ...", blockNum);
+    packet.setData(payloadFactory.createAck(blockNum));
+    try {
+      socket.send(packet);
+      return true;
+    } catch (IOException e) {
+      LOG.error("I/O error while sending ACK {}", blockNum);
+      return false;
     }
   }
 
@@ -77,7 +183,7 @@ public class Channel {
     try (InputStream inputStream = new FileInputStream(path)) {
       int blockNum = 1;
       byte[] data = new byte[512];
-      while (true) {
+      while (!stop) {
         int size = inputStream.read(data);
         if (size == -1) {
           LOG.info("Sending file '{}' done!", path);
@@ -85,9 +191,18 @@ public class Channel {
         }
 
         LOG.info("Sending {} bytes of '{}' ...", size, path);
-        sendData(blockNum, data, size);
+        try {
+          sendData(blockNum, data, size);
+        } catch (IOException e) {
+          LOG.error("I/O error while sending data: {}", e.getMessage(), e);
+          sendError(ErrorCode.NOT_DEFINED, e.getMessage());
+          return;
+        }
 
-        receiveAck(blockNum);
+        if (!receiveAck(blockNum)) {
+          sendError(ErrorCode.NOT_DEFINED, "Did not receive ACK for " + blockNum);
+          return;
+        }
 
         // max 2 bytes for blockNum -> wrap around after 0xffff
         blockNum = (blockNum + 1) & 0xffff;
@@ -96,25 +211,16 @@ public class Channel {
       LOG.error("File not found: {}", path);
       sendError(ErrorCode.FILE_NOT_FOUND, e.getMessage());
     } catch (IOException e) {
-      LOG.error("Error while sending data: {}", e.getMessage(), e);
+      LOG.error("I/O error while sending file: {}", e.getMessage(), e);
       sendError(ErrorCode.NOT_DEFINED, e.getMessage());
     }
   }
 
   public void receiveFile(String localPath) {
     try (FileOutputStream out = new FileOutputStream(localPath)) {
-      while (true) {
-        packet.setData(new byte[516]);
-        socket.receive(packet);
-
-        Message message = messageParser.parse(packet);
-        if (message == null) {
-          String msg = "Invalid packet from peer";
-          LOG.error(msg);
-          throw new IllegalStateException(msg);
-        } else if (message.opcode() == Opcode.DATA) {
-          LOG.info("Received data of {} bytes", message.data().length);
-
+      while (!stop) {
+        Message message = receiveData();
+        if (message != null) {
           byte[] data = message.data();
           out.write(data);
 
@@ -123,17 +229,18 @@ public class Channel {
           if (data.length < 512) {
             break;
           }
-        } else if (message.opcode() == Opcode.ERROR) {
-          LOG.error("Received error, will abort transfer: {} ({})", message.errorCode(), message.errorMessage());
-          break;
         } else {
-          String msg = "Unexpected opcode: " + message.opcode();
-          LOG.error(msg);
-          throw new IllegalStateException(msg);
+          return;
         }
       }
     } catch (IOException e) {
-      LOG.error("I/O error while receiving data from peer. Abort.", e);
+      LOG.error("I/O error while receiving data: {}", e.getMessage(), e);
+      sendError(ErrorCode.NOT_DEFINED, e.getMessage());
     }
+  }
+
+  public void shutdown() {
+    // stop receiving or sending data on this channel
+    stop = true;
   }
 }

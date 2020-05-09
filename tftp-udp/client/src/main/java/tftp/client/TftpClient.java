@@ -41,12 +41,12 @@ public class TftpClient {
         return;
       }
 
-      new Channel(socket, packet).receiveFile(localPath);
+      new Channel(socket, packet, true).receiveFile(localPath);
     }
   }
 
   public void put(String localPath, String remotePath) throws IOException {
-    try (DatagramSocket socket = new DatagramSocket(serverPort + 1)) {
+    try (DatagramSocket socket = new DatagramSocket(clientPort)) {
       InetAddress address = InetAddress.getByName("localhost");
 
       byte[] bytes = payloadFactory.createWRQ(remotePath);
@@ -60,9 +60,10 @@ public class TftpClient {
         return;
       }
 
-      final Channel channel = new Channel(socket, packet);
-      channel.receiveAck(0);
-      channel.sendFile(localPath);
+      final Channel channel = new Channel(socket, packet, true);
+      if (channel.receiveAck(0)) {
+        channel.sendFile(localPath);
+      }
     }
   }
 }

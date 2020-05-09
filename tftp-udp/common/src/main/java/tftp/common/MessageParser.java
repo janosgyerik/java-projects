@@ -75,6 +75,11 @@ public class MessageParser {
     public String path() {
       return path;
     }
+
+    @Override
+    public String toString() {
+      return String.format("%s(%s)", opcode, path);
+    }
   }
 
   private static class RRQMessage extends PathMessage {
@@ -112,6 +117,11 @@ public class MessageParser {
     public byte[] data() {
       return data;
     }
+
+    @Override
+    public String toString() {
+      return String.format("DATA(%s;%s)", blockNum, data.length);
+    }
   }
 
   private static class ErrorMessage implements Message {
@@ -137,6 +147,11 @@ public class MessageParser {
     public String errorMessage() {
       return message;
     }
+
+    @Override
+    public String toString() {
+      return String.format("ERROR(%s;%s)", errorCode, message);
+    }
   }
 
   private static class AckMessage implements Message {
@@ -154,6 +169,11 @@ public class MessageParser {
     @Override
     public int blockNum() {
       return blockNum;
+    }
+
+    @Override
+    public String toString() {
+      return String.format("ACK(%s)", blockNum);
     }
   }
 }
