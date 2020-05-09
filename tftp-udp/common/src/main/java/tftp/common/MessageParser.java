@@ -139,16 +139,6 @@ public class MessageParser {
     }
 
     @Override
-    public byte errorCode() {
-      return errorCode;
-    }
-
-    @Override
-    public String errorMessage() {
-      return message;
-    }
-
-    @Override
     public String toString() {
       return String.format("ERROR(%s;%s)", errorCode, message);
     }
