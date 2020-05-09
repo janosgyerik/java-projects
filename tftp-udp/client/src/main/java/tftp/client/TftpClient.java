@@ -9,7 +9,7 @@ import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tftp.common.PayloadFactory;
-import tftp.common.message.Channel;
+import tftp.common.Channel;
 
 public class TftpClient {
 

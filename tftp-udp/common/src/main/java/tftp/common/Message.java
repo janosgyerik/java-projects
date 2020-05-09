@@ -1,6 +1,4 @@
-package tftp.common.message;
-
-import tftp.common.Opcode;
+package tftp.common;
 
 public interface Message {
 

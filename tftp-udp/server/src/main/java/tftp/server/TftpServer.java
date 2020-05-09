@@ -6,9 +6,9 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.message.Channel;
-import tftp.common.message.Message;
-import tftp.common.message.MessageParser;
+import tftp.common.Channel;
+import tftp.common.Message;
+import tftp.common.MessageParser;
 
 import static tftp.common.Opcode.RRQ;
 import static tftp.common.Opcode.WRQ;

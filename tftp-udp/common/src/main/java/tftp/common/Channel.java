@@ -1,4 +1,4 @@
-package tftp.common.message;
+package tftp.common;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -9,9 +9,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.ErrorCode;
-import tftp.common.Opcode;
-import tftp.common.PayloadFactory;
 
 public class Channel {
   private static final Logger LOG = LoggerFactory.getLogger(Channel.class);
@@ -56,6 +53,44 @@ public class Channel {
     }
   }
 
+  private void sendError(ErrorCode error, String message) {
+    packet.setData(payloadFactory.createError(error, message));
+    try {
+      socket.send(packet);
+    } catch (IOException e) {
+      LOG.error("I/O error while sending ERROR: {}", e.getMessage(), e);
+    }
+  }
+
+  private void sendData(byte[] data, int size) throws IOException {
+    packet.setData(payloadFactory.createData(0, data, size));
+    socket.send(packet);
+  }
+
+  public void sendFile(String path) {
+    try (InputStream inputStream = new FileInputStream(path)) {
+      byte[] data = new byte[512];
+      while (true) {
+        int size = inputStream.read(data);
+        if (size == -1) {
+          LOG.info("Sending file '{}' done!", path);
+          break;
+        }
+
+        LOG.info("Sending {} bytes of '{}' ...", size, path);
+        sendData(data, size);
+
+        receiveAck();
+      }
+    } catch (FileNotFoundException e) {
+      LOG.error("File not found: {}", path);
+      sendError(ErrorCode.FILE_NOT_FOUND, e.getMessage());
+    } catch (IOException e) {
+      LOG.error("Error while sending data: {}", e.getMessage(), e);
+      sendError(ErrorCode.NOT_DEFINED, e.getMessage());
+    }
+  }
+
   public void receiveFile(String localPath) {
     try (FileOutputStream out = new FileOutputStream(localPath)) {
       while (true) {
@@ -89,44 +124,6 @@ public class Channel {
       }
     } catch (IOException e) {
       LOG.error("I/O error while receiving data from peer. Abort.", e);
-    }
-  }
-
-  public void sendFile(String path) {
-    try (InputStream inputStream = new FileInputStream(path)) {
-      byte[] data = new byte[512];
-      while (true) {
-        int size = inputStream.read(data);
-        if (size == -1) {
-          LOG.info("Sending file '{}' done!", path);
-          break;
-        }
-
-        LOG.info("Sending {} bytes of '{}' ...", size, path);
-        sendData(data, size);
-
-        receiveAck();
-      }
-    } catch (FileNotFoundException e) {
-      LOG.error("File not found: {}", path);
-      sendError(ErrorCode.FILE_NOT_FOUND, e.getMessage());
-    } catch (IOException e) {
-      LOG.error("Error while sending data: {}", e.getMessage(), e);
-      sendError(ErrorCode.NOT_DEFINED, e.getMessage());
-    }
-  }
-
-  private void sendData(byte[] data, int size) throws IOException {
-    packet.setData(payloadFactory.createData(0, data, size));
-    socket.send(packet);
-  }
-
-  private void sendError(ErrorCode error, String message) {
-    packet.setData(payloadFactory.createError(error, message));
-    try {
-      socket.send(packet);
-    } catch (IOException e) {
-      LOG.error("I/O error while sending ERROR: {}", e.getMessage(), e);
     }
   }
 }

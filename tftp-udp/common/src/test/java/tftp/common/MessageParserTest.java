@@ -2,8 +2,6 @@ package tftp.common;
 
 import java.net.DatagramPacket;
 import org.junit.jupiter.api.Test;
-import tftp.common.message.Message;
-import tftp.common.message.MessageParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
