@@ -227,17 +227,17 @@ public class Channel {
     try (FileOutputStream out = new FileOutputStream(localPath)) {
       while (!stop) {
         Message message = receiveData();
-        if (message != null) {
-          byte[] data = message.data();
-          out.write(data);
-
-          sendAck(message.blockNum());
-
-          if (data.length < 512) {
-            break;
-          }
-        } else {
+        if (message == null) {
           return;
+        }
+
+        byte[] data = message.data();
+        out.write(data);
+
+        sendAck(message.blockNum());
+
+        if (data.length < 512) {
+          break;
         }
       }
     } catch (IOException e) {
