@@ -8,11 +8,11 @@ import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.Channel;
 import tftp.common.Message;
 import tftp.common.MessageParser;
+import tftp.common.channel.AsyncChannel;
 
-import static tftp.common.Channel.MAX_PACKET_LENGTH;
+import static tftp.common.channel.Channel.MAX_PACKET_LENGTH;
 
 public class TftpServer {
 
@@ -30,7 +30,7 @@ public class TftpServer {
   public void start() throws IOException {
     LOG.info("Starting server on port {} ...", port);
 
-    Map<String, Channel> channels = new HashMap<>();
+    Map<String, AsyncChannel> channels = new HashMap<>();
 
     try (DatagramSocket socket = new DatagramSocket(port)) {
       while (!stop) {
@@ -63,7 +63,7 @@ public class TftpServer {
             if (channels.containsKey(key)) {
               channels.remove(key).shutdown();
             }
-            final Channel channel = new Channel(socket, packet, false);
+            final AsyncChannel channel = new AsyncChannel(socket, packet);
             channels.put(key, channel);
             new Thread(() -> channel.sendFile(message.path())).start();
             break;
@@ -73,7 +73,7 @@ public class TftpServer {
             if (channels.containsKey(key)) {
               channels.remove(key).shutdown();
             }
-            final Channel channel = new Channel(socket, packet, false);
+            final AsyncChannel channel = new AsyncChannel(socket, packet);
             if (channel.sendAck(0)) {
               channels.put(key, channel);
               new Thread(() -> channel.receiveFile(message.path())).start();

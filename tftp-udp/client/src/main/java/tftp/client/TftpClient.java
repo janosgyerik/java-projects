@@ -8,8 +8,9 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.Channel;
+import tftp.common.channel.Channel;
 import tftp.common.PayloadFactory;
+import tftp.common.channel.SyncChannel;
 
 public class TftpClient {
 
@@ -41,7 +42,7 @@ public class TftpClient {
         return;
       }
 
-      new Channel(socket, packet, true).receiveFile(localPath);
+      new SyncChannel(socket, packet).receiveFile(localPath);
     }
   }
 
@@ -60,7 +61,7 @@ public class TftpClient {
         return;
       }
 
-      final Channel channel = new Channel(socket, packet, true);
+      final Channel channel = new SyncChannel(socket, packet);
       if (channel.receiveAck(0)) {
         channel.sendFile(localPath);
       }

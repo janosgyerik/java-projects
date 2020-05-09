@@ -1,4 +1,4 @@
-package tftp.common;
+package tftp.common.channel;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -7,63 +7,39 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.SocketTimeoutException;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tftp.common.ErrorCode;
+import tftp.common.Message;
+import tftp.common.MessageParser;
+import tftp.common.Opcode;
+import tftp.common.PayloadFactory;
 
-public class Channel {
-  private static final Logger LOG = LoggerFactory.getLogger(Channel.class);
+abstract class AbstractChannel implements Channel {
 
-  public static final int MAX_PACKET_LENGTH = 516;
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractChannel.class);
 
-  private static final int TIMEOUT_SECONDS = 1;
+  protected static final int TIMEOUT_SECONDS = 1;
 
-  private final MessageParser messageParser = new MessageParser();
+  protected final MessageParser messageParser = new MessageParser();
   private final PayloadFactory payloadFactory = new PayloadFactory();
-  private final BlockingDeque<Message> messageQueue = new LinkedBlockingDeque<>();
 
-  private final DatagramSocket socket;
-  private final DatagramPacket packet;
-  private final boolean sync;
+  protected final DatagramSocket socket;
+  protected final DatagramPacket packet;
 
   private volatile boolean stop = false;
 
-  public Channel(DatagramSocket socket, DatagramPacket packet, boolean sync) {
+  public AbstractChannel(DatagramSocket socket, DatagramPacket packet) {
     this.socket = socket;
     this.packet = packet;
-    this.sync = sync;
   }
 
-  public void receive(Message message) {
-    messageQueue.add(message);
-  }
+  @Override
+  public abstract boolean receiveAck(int blockNum);
 
-  private Message receiveMessage() {
-    try {
-      packet.setData(new byte[MAX_PACKET_LENGTH]);
-      socket.setSoTimeout(TIMEOUT_SECONDS * 1000);
-      socket.receive(packet);
-    } catch (SocketTimeoutException e) {
-      LOG.error("Socket timed out while waiting for packet");
-      return null;
-    } catch (IOException e) {
-      LOG.error("I/O error while receiving packet");
-      return null;
-    }
+  protected abstract Message receiveData();
 
-    Message message = messageParser.parse(packet);
-    if (message == null) {
-      LOG.error("Invalid packet from peer");
-      return null;
-    }
-
-    return message;
-  }
-
-  private boolean isExpectedAck(Message message, int blockNum) {
+  protected boolean isExpectedAck(Message message, int blockNum) {
     if (message.opcode() != Opcode.ACK) {
       LOG.error("Expected ACK with blockNum = {}; got: {}", blockNum, message);
       return false;
@@ -74,90 +50,6 @@ public class Channel {
       return false;
     }
     return true;
-  }
-
-  private boolean awaitAck(int blockNum) {
-    LOG.info("Waiting for ACK {} ...", blockNum);
-    Message message;
-    try {
-      message = messageQueue.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.error("Interrupted while waiting for ACK {}", blockNum);
-      return false;
-    }
-
-    if (message == null) {
-      LOG.error("Did not receive ACK {} on time", blockNum);
-      return false;
-    }
-
-    if (!isExpectedAck(message, blockNum)) {
-      return false;
-    }
-
-    LOG.info("Received ACK {}", message.blockNum());
-    return true;
-  }
-
-  public boolean receiveAck(int blockNum) {
-    if (!sync) {
-      return awaitAck(blockNum);
-    }
-
-    final Message message = receiveMessage();
-    if (message == null) {
-      return false;
-    }
-
-    if (!isExpectedAck(message, blockNum)) {
-      return false;
-    }
-
-    LOG.info("Received ACK {}", message.blockNum());
-    return true;
-  }
-
-  private Message awaitData() {
-    LOG.info("Waiting for DATA ...");
-    Message message;
-    try {
-      message = messageQueue.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.error("Interrupted while waiting for DATA");
-      return null;
-    }
-
-    if (message == null) {
-      LOG.error("Did not receive DATA on time");
-      return null;
-    }
-
-    if (message.opcode() != Opcode.DATA) {
-      LOG.error("Expected DATA; got: {}", message);
-      return null;
-    }
-
-    LOG.info("Received {}", message);
-    return message;
-  }
-
-  private Message receiveData() {
-    if (!sync) {
-      return awaitData();
-    }
-
-    final Message message = receiveMessage();
-    if (message == null) {
-      return null;
-    }
-
-    if (message.opcode() != Opcode.DATA) {
-      LOG.error("Expected DATA; got: {}", message);
-      return null;
-    }
-
-    LOG.info("Received {}", message);
-    return message;
   }
 
   public boolean sendAck(int blockNum) {
@@ -186,6 +78,7 @@ public class Channel {
     socket.send(packet);
   }
 
+  @Override
   public void sendFile(String path) {
     try (InputStream inputStream = new FileInputStream(path)) {
       int blockNum = 1;
