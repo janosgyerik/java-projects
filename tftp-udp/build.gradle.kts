@@ -12,9 +12,9 @@ subprojects {
 
     dependencyManagement {
         dependencies {
-            dependency("org.slf4j:slf4j-simple:1.6.1")
-            dependency("org.junit.jupiter:junit-jupiter-api:5.6.0")
-            dependency("org.junit.jupiter:junit-jupiter-engine:5.6.0")
+            dependency("org.slf4j:slf4j-simple:1.7.25")
+            dependency("org.junit.jupiter:junit-jupiter-api:5.6.2")
+            dependency("org.junit.jupiter:junit-jupiter-engine:5.6.2")
         }
     }
 }
