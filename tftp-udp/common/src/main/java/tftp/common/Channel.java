@@ -47,7 +47,7 @@ public class Channel {
       socket.setSoTimeout(TIMEOUT_SECONDS * 1000);
       socket.receive(packet);
     } catch (SocketTimeoutException e) {
-      LOG.error("Socket timed out while receiving packet");
+      LOG.error("Socket timed out while waiting for packet");
       return null;
     } catch (IOException e) {
       LOG.error("I/O error while receiving packet");
