@@ -1,11 +1,10 @@
 package tftp.client;
 
-import java.net.SocketException;
-import java.net.UnknownHostException;
+import java.io.IOException;
 
 public class TftpClientCli {
 
-  public static void main(String[] args) throws SocketException, UnknownHostException {
+  public static void main(String[] args) throws IOException {
     int port = 2000;
     TftpClient client = new TftpClient(port);
     switch (args[0]) {

@@ -3,7 +3,6 @@ package tftp.server;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.SocketException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tftp.common.Channel;
@@ -26,7 +25,7 @@ public class TftpServer {
     this.port = port;
   }
 
-  public void start() throws SocketException {
+  public void start() throws IOException {
     try (DatagramSocket socket = new DatagramSocket(port)) {
       // a buffer big enough for all operations
       byte[] buffer = new byte[516];
@@ -47,8 +46,9 @@ public class TftpServer {
         } else if (message.opcode() == RRQ) {
           new Channel(socket, packet).sendFile(message.path());
         } else if (message.opcode() == WRQ) {
-          // TODO send ACK with blockNum=0 first!
-          new Channel(socket).receiveFile(message.path());
+          final Channel channel = new Channel(socket, packet);
+          channel.sendAck(0);
+          channel.receiveFile(message.path());
         } else {
           LOG.error("Unexpected opcode {}, ignoring packet", message.opcode());
         }

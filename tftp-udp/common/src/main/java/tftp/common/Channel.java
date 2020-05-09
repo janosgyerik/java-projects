@@ -28,13 +28,13 @@ public class Channel {
     this.packet = packet;
   }
 
-  private void sendAck(int blockNum) throws IOException {
+  public void sendAck(int blockNum) throws IOException {
     LOG.info("Sending ACK {} ...", blockNum);
     packet.setData(payloadFactory.createAck(blockNum));
     socket.send(packet);
   }
 
-  private void receiveAck(int blockNum) throws IOException {
+  public void receiveAck(int blockNum) throws IOException {
     LOG.info("Waiting for ACK {} ...", blockNum);
     socket.receive(packet);
 

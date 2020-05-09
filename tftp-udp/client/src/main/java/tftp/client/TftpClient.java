@@ -8,8 +8,8 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tftp.common.PayloadFactory;
 import tftp.common.Channel;
+import tftp.common.PayloadFactory;
 
 public class TftpClient {
 
@@ -41,7 +41,7 @@ public class TftpClient {
     }
   }
 
-  public void put(String localPath, String remotePath) throws SocketException, UnknownHostException {
+  public void put(String localPath, String remotePath) throws IOException {
     try (DatagramSocket socket = new DatagramSocket(serverPort + 1)) {
       InetAddress address = InetAddress.getByName("localhost");
 
@@ -56,9 +56,9 @@ public class TftpClient {
         return;
       }
 
-      // TODO receive ACK with blockNum=0 first!
-
-      new Channel(socket, packet).sendFile(localPath);
+      final Channel channel = new Channel(socket, packet);
+      channel.receiveAck(0);
+      channel.sendFile(localPath);
     }
   }
 }
