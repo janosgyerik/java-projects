@@ -16,15 +16,19 @@ public class TftpClient {
   private static final Logger LOG = LoggerFactory.getLogger(TftpClient.class);
 
   private final PayloadFactory payloadFactory = new PayloadFactory();
+  private final String serverHost;
   private final int serverPort;
+  private final int clientPort;
 
-  public TftpClient(int serverPort) {
+  public TftpClient(String serverHost, int serverPort, int clientPort) {
+    this.serverHost = serverHost;
     this.serverPort = serverPort;
+    this.clientPort = clientPort;
   }
 
   public void get(String remotePath, String localPath) throws SocketException, UnknownHostException {
-    try (DatagramSocket socket = new DatagramSocket(serverPort + 1)) {
-      InetAddress address = InetAddress.getByName("localhost");
+    try (DatagramSocket socket = new DatagramSocket(clientPort)) {
+      InetAddress address = InetAddress.getByName(serverHost);
 
       byte[] bytes = payloadFactory.createRRQ(remotePath);
       DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address, serverPort);

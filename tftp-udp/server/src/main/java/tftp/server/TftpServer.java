@@ -26,6 +26,8 @@ public class TftpServer {
   }
 
   public void start() throws IOException {
+    LOG.info("Starting server on port {} ...", port);
+
     try (DatagramSocket socket = new DatagramSocket(port)) {
       // a buffer big enough for all operations
       byte[] buffer = new byte[516];
