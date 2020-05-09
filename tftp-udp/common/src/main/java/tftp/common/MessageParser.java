@@ -28,11 +28,11 @@ public class MessageParser {
     }
 
     if (opcode == Opcode.DATA.opcode()) {
-      return new DataMessage(Arrays.copyOfRange(bytes, 4, payloadSize));
+      return new DataMessage(wordToInt(bytes, 2), Arrays.copyOfRange(bytes, 4, payloadSize));
     }
 
     if (opcode == Opcode.ACK.opcode()) {
-      return new AckMessage();
+      return new AckMessage(wordToInt(bytes, 2));
     }
 
     if (opcode == Opcode.ERROR.opcode()) {
@@ -42,7 +42,12 @@ public class MessageParser {
     return null;
   }
 
-  private String extractStringAt(byte[] bytes, int start) {
+  private static int wordToInt(byte[] bytes, int start) {
+    // The "& 0xff" is to drop the sign bits
+    return ((bytes[start] & 0xff) << 8) + (bytes[start + 1] & 0xff);
+  }
+
+  private static String extractStringAt(byte[] bytes, int start) {
     int end = start + 1;
     for (; end < bytes.length; end++) {
       if (bytes[end] == 0) {
@@ -85,15 +90,22 @@ public class MessageParser {
   }
 
   private static class DataMessage implements Message {
+    private final int blockNum;
     private final byte[] data;
 
-    DataMessage(byte[] data) {
+    DataMessage(int blockNum, byte[] data) {
+      this.blockNum = blockNum;
       this.data = data;
     }
 
     @Override
     public Opcode opcode() {
       return Opcode.DATA;
+    }
+
+    @Override
+    public int blockNum() {
+      return blockNum;
     }
 
     @Override
@@ -128,9 +140,20 @@ public class MessageParser {
   }
 
   private static class AckMessage implements Message {
+    private final int blockNum;
+
+    AckMessage(int blockNum) {
+      this.blockNum = blockNum;
+    }
+
     @Override
     public Opcode opcode() {
       return Opcode.ACK;
+    }
+
+    @Override
+    public int blockNum() {
+      return blockNum;
     }
   }
 }

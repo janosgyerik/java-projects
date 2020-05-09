@@ -56,6 +56,8 @@ public class TftpClient {
         return;
       }
 
+      // TODO receive ACK with blockNum=0 first!
+
       new Channel(socket, packet).sendFile(localPath);
     }
   }

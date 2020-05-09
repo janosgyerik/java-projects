@@ -47,6 +47,7 @@ public class TftpServer {
         } else if (message.opcode() == RRQ) {
           new Channel(socket, packet).sendFile(message.path());
         } else if (message.opcode() == WRQ) {
+          // TODO send ACK with blockNum=0 first!
           new Channel(socket).receiveFile(message.path());
         } else {
           LOG.error("Unexpected opcode {}, ignoring packet", message.opcode());

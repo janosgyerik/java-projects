@@ -4,7 +4,7 @@ public class PayloadFactory {
   public byte[] createData(int blockNum, byte[] data, int size) {
     byte[] bytes = new byte[2 + 2 + size];
     bytes[1] = Opcode.DATA.opcode();
-    bytes[2] = (byte) (blockNum >> 8);
+    bytes[2] = (byte) ((blockNum >> 8) & 0xff);
     bytes[3] = (byte) (blockNum & 0xff);
     System.arraycopy(data, 0, bytes, 4, size);
     return bytes;
@@ -40,7 +40,7 @@ public class PayloadFactory {
   public byte[] createAck(int blockNum) {
     byte[] bytes = new byte[2 + 2];
     bytes[1] = Opcode.ACK.opcode();
-    bytes[2] = (byte) (blockNum >> 8);
+    bytes[2] = (byte) ((blockNum >> 8) & 0xff);
     bytes[3] = (byte) (blockNum & 0xff);
     return bytes;
   }

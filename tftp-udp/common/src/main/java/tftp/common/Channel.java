@@ -28,14 +28,14 @@ public class Channel {
     this.packet = packet;
   }
 
-  private void sendAck() throws IOException {
-    LOG.info("Sending ACK ...");
-    packet.setData(payloadFactory.createAck(0));
+  private void sendAck(int blockNum) throws IOException {
+    LOG.info("Sending ACK {} ...", blockNum);
+    packet.setData(payloadFactory.createAck(blockNum));
     socket.send(packet);
   }
 
-  private void receiveAck() throws IOException {
-    LOG.info("Waiting for ACK ...");
+  private void receiveAck(int blockNum) throws IOException {
+    LOG.info("Waiting for ACK {} ...", blockNum);
     socket.receive(packet);
 
     Message message = messageParser.parse(packet);
@@ -47,7 +47,13 @@ public class Channel {
     }
 
     if (message.opcode() != Opcode.ACK) {
-      String msg = "Expected ACK. Got: " + message.opcode();
+      String msg = "Expected ACK; got: " + message.opcode();
+      LOG.error(msg);
+      throw new IllegalStateException(msg);
+    }
+
+    if (message.blockNum() != blockNum) {
+      String msg = String.format("Expected blockNum = %s; got: %s", blockNum, message.blockNum());
       LOG.error(msg);
       throw new IllegalStateException(msg);
     }
@@ -62,13 +68,14 @@ public class Channel {
     }
   }
 
-  private void sendData(byte[] data, int size) throws IOException {
-    packet.setData(payloadFactory.createData(0, data, size));
+  private void sendData(int blockNum, byte[] data, int size) throws IOException {
+    packet.setData(payloadFactory.createData(blockNum, data, size));
     socket.send(packet);
   }
 
   public void sendFile(String path) {
     try (InputStream inputStream = new FileInputStream(path)) {
+      int blockNum = 1;
       byte[] data = new byte[512];
       while (true) {
         int size = inputStream.read(data);
@@ -78,9 +85,12 @@ public class Channel {
         }
 
         LOG.info("Sending {} bytes of '{}' ...", size, path);
-        sendData(data, size);
+        sendData(blockNum, data, size);
 
-        receiveAck();
+        receiveAck(blockNum);
+
+        // max 2 bytes for blockNum -> wrap around after 0xffff
+        blockNum = (blockNum + 1) & 0xffff;
       }
     } catch (FileNotFoundException e) {
       LOG.error("File not found: {}", path);
@@ -108,7 +118,7 @@ public class Channel {
           byte[] data = message.data();
           out.write(data);
 
-          sendAck();
+          sendAck(message.blockNum());
 
           if (data.length < 512) {
             break;
