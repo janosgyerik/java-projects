@@ -47,7 +47,7 @@ public class TftpClient {
 
   public void put(String localPath, String remotePath) throws IOException {
     try (DatagramSocket socket = new DatagramSocket(clientPort)) {
-      InetAddress address = InetAddress.getByName("localhost");
+      InetAddress address = InetAddress.getByName(serverHost);
 
       byte[] bytes = payloadFactory.createWRQ(remotePath);
       DatagramPacket packet = new DatagramPacket(bytes, bytes.length, address, serverPort);
